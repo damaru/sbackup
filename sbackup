@@ -1,0 +1,105 @@
+#!/usr/bin/perl
+
+my $et ="z"; #default compression method is gzip
+my $v = ""; 
+
+while ($#ARGV >= 0) {
+  if($dir eq '') {
+		if ($ARGV[0] eq "-v") { 
+			$v = 'v';                 
+			shift; 
+			next; 
+		} elsif ($ARGV[0] eq "-j") {
+			$et = 'j';
+			shift;
+			next;
+		}
+	}
+
+	if ($ARGV[0] =~ /^-/) { 
+		usage(); 
+	}
+
+	if ($#ARGV == 0) {
+		$file = shift;
+		if (-f $file) {
+			print "$file exists. Overwrite? [y|n]: ";
+			$in = <>;
+			if (!($in =~ /y/i)) {
+				usage("File Exists");
+			}
+		}
+	} else {
+		$file = shift;
+		if (! -e $file) {
+			usage("$file does not exist");
+		}
+		$dir .= " " . $file;
+	}
+}
+
+if(!defined($dir) || !defined($file)) {
+	usage();
+}
+
+my $password = getpass();
+open IN, "tar --exclude='*.o' -c$v$et $dir | openssl des3 -salt -pass pass:$password|";
+open OUT, ">$file";
+
+print OUT<<HEAD;
+#!/bin/bash
+if [ -z \$1 ] ; then
+	echo "USAGE"
+	echo "	\$0 <dir>"
+	exit
+fi
+if [ ! -d \$1 ] ; then 
+	mkdir -p \$1 || exit
+fi
+ARCHIVE=`awk '/^__ARCHIVE_BELOW__/ {print NR + 1; exit 0; }' \$0`
+tail -n+\$ARCHIVE \$0  | openssl des3 -d -salt | tar -xv$et -C \$1
+exit
+__ARCHIVE_BELOW__
+HEAD
+
+while(<IN>){
+	print OUT;
+}
+close(OUT);
+chmod 0755,$file;
+
+# done
+
+sub getpass {
+	system("stty -echo");
+	print "Enter a strong password: ";
+	$pass1 = <>;
+	print "\nVerify the password: ";
+	$pass2 = <>;
+	print "\n";
+	system("stty echo\n");
+	if ($pass1 ne $pass2) {
+		error( "Passwords do not match\n");
+	}
+	return $pass1;
+}
+
+sub usage{
+	$er = shift;
+	print "Error: $er\n" if defined($er);
+	print "sbackup - create encrypted archive\n\n";
+	print "USAGE:\n";
+	print "sbackup [-h] [-v] [-j] <in1> [<in2> <in3> <in4> ..] <output-exe-file>\n";
+	print "  -h  help\n";
+	print "  -v  verbose\n";
+	print "  -j  use bzip2 compression\n";
+	print "  in1, in2 etc = input file or directory\n\n";
+	exit(-1);
+}
+
+sub error {
+	$er = shift;
+	print "Error: $er\n" if defined($er);
+	exit(-1);
+}
+
