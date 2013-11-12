@@ -1,14 +1,18 @@
 #!/usr/bin/perl
 
-my $et ="z"; #default compression method is gzip
+my $et ="z";#j
 my $v = ""; 
 
 while ($#ARGV >= 0) {
-  if($dir eq '') {
+	if($dir eq '') {
 		if ($ARGV[0] eq "-v") { 
 			$v = 'v';                 
 			shift; 
 			next; 
+		} elsif ($ARGV[0] eq "-i") {
+			$comment = 1;
+			shift;
+			next;
 		} elsif ($ARGV[0] eq "-j") {
 			$et = 'j';
 			shift;
@@ -42,12 +46,17 @@ if(!defined($dir) || !defined($file)) {
 	usage();
 }
 
+if(defined($comment)){
+	$comment = $dir;
+}
+
 my $password = getpass();
-open IN, "tar --exclude='*.o' -c$v$et $dir | openssl des3 -salt -pass pass:$password|";
+open IN, "tar --exclude='*.*~'--exclude='*.o' -c$v$et $dir | openssl des3 -salt -pass pass:$password|";
 open OUT, ">$file";
 
 print OUT<<HEAD;
 #!/bin/bash
+# $comment
 if [ -z \$1 ] ; then
 	echo "USAGE"
 	echo "	\$0 <dir>"
@@ -102,4 +111,3 @@ sub error {
 	print "Error: $er\n" if defined($er);
 	exit(-1);
 }
-
